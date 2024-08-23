@@ -1,0 +1,129 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+
+getgenv().CamlockState = false
+getgenv().Prediction = 0.1238
+
+-- Create ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Create Frame
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 180, 0, 60)
+Frame.Position = UDim2.new(0.5, -90, 0.1, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Red frame color
+Frame.BorderSizePixel = 0
+Frame.Parent = ScreenGui
+Frame.AnchorPoint = Vector2.new(0.5, 0)
+
+-- Add UICorner for rounded corners
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = Frame
+
+-- Create Button
+local CamlockButton = Instance.new("TextButton")
+CamlockButton.Size = UDim2.new(0, 160, 0, 40)
+CamlockButton.Position = UDim2.new(0.5, 0, 0.5, 0)
+CamlockButton.Text = "vamp.cc"
+CamlockButton.TextColor3 = Color3.fromRGB(255, 255, 255) -- White text color
+CamlockButton.BackgroundColor3 = Color3.fromRGB(75, 75, 75)
+CamlockButton.BorderSizePixel = 0
+CamlockButton.Font = Enum.Font.GothamBold
+CamlockButton.TextSize = 22
+CamlockButton.AnchorPoint = Vector2.new(0.5, 0.5)
+CamlockButton.Parent = Frame
+
+-- Add UICorner for button rounded corners
+local ButtonCorner = Instance.new("UICorner")
+ButtonCorner.CornerRadius = UDim.new(0, 8)
+ButtonCorner.Parent = CamlockButton
+
+-- Function to find the nearest enemy
+local function FindNearestEnemy()
+    local ClosestDistance, ClosestPlayer = math.huge, nil
+    local CenterPosition = Vector2.new(workspace.CurrentCamera.ViewportSize.X / 2, workspace.CurrentCamera.ViewportSize.Y / 2)
+
+    for _, Player in ipairs(Players:GetPlayers()) do
+        if Player ~= LocalPlayer then
+            local Character = Player.Character
+            if Character and Character:FindFirstChild("HumanoidRootPart") and Character.Humanoid.Health > 0 then
+                local Position, IsVisibleOnViewport = workspace.CurrentCamera:WorldToViewportPoint(Character.HumanoidRootPart.Position)
+                if IsVisibleOnViewport then
+                    local Distance = (CenterPosition - Vector2.new(Position.X, Position.Y)).Magnitude
+                    if Distance < ClosestDistance then
+                        ClosestPlayer = Character.HumanoidRootPart
+                        ClosestDistance = Distance
+                    end
+                end
+            end
+        end
+    end
+
+    return ClosestPlayer
+end
+
+-- Function to toggle camlock
+local function ToggleCamlock()
+    getgenv().CamlockState = not getgenv().CamlockState
+    CamlockButton.Text = getgenv().CamlockState and "vamp.cc ON" or "vamp.cc OFF"
+    
+    if getgenv().CamlockState then
+        enemy = FindNearestEnemy()
+    else
+        enemy = nil
+    end
+end
+
+-- Aim the camera at the nearest enemy's HumanoidRootPart
+RunService.Heartbeat:Connect(function()
+    if getgenv().CamlockState and enemy then
+        local camera = workspace.CurrentCamera
+        camera.CFrame = CFrame.new(camera.CFrame.Position, enemy.Position + enemy.Velocity * getgenv().Prediction)
+    end
+end)
+
+-- Connect button click to toggle camlock
+CamlockButton.MouseButton1Click:Connect(ToggleCamlock)
+
+-- Make the Frame draggable
+local dragging = false
+local dragInput
+local dragStart
+local startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = Frame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+Frame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input == dragInput then
+        update(input)
+    end
+end)
